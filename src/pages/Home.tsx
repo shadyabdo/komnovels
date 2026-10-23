@@ -11,15 +11,23 @@ export default function Home() {
   useEffect(() => {
     (async () => {
       try {
+        console.log('🏠 Home: Loading novels...');
         const [n, c] = await Promise.all([getAllNovels(), getAllChaptersWithNovels()]);
+        console.log('🏠 Home: Loaded', n.length, 'novels and', c.length, 'chapters');
         setNovels(n);
         setChapters(c.slice(0, 10));
-      } catch (e) { console.error(e); }
-      finally { setLoading(false); }
+      } catch (e) { 
+        console.error('❌ Home: Error loading data:', e);
+      } finally { 
+        setLoading(false);
+        console.log('🏠 Home: Loading complete');
+      }
     })();
   }, []);
 
   if (loading) return <Loading text="جاري تحميل البيانات..." />;
+
+  console.log('🏠 Home: Rendering with', novels.length, 'novels');
 
   const totalChapters = novels.reduce((a, n) => a + n.totalChapters, 0);
 

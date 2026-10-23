@@ -1,24 +1,24 @@
 import { firestore } from './firebase';
-import { collection, getDocs, doc, getDoc, query, orderBy } from 'firebase/firestore';
+import { collection, getDocs } from 'firebase/firestore';
 
 // ===== Types =====
 export interface Chapter {
-  id: string | number;
+  id: string;
   title: string;
   content: string;
   dateAdded: string;
-  number?: number;
+  number: number;
 }
 
 export interface Volume {
-  id: string | number;
+  id: string;
   title: string;
   chapters: Chapter[];
-  number?: number;
+  number: number;
 }
 
 export interface Novel {
-  id: string | number;
+  id: string;
   title: string;
   author: string;
   cover: string;
@@ -34,48 +34,43 @@ export interface Novel {
   totalChapters: number;
 }
 
+// ===== Cache =====
+let novelsCache: Novel[] | null = null;
+let cacheTimestamp = 0;
+const CACHE_DURATION = 60000; // 1 minute
+
 // ===== Helpers =====
-function getStr(obj: any, ...keys: string[]): string {
-  for (const k of keys) {
-    if (obj[k] !== undefined && obj[k] !== null) return String(obj[k]);
-  }
-  return '';
+function safeString(val: any): string {
+  if (val === null || val === undefined) return '';
+  if (typeof val === 'string') return val;
+  if (typeof val === 'number') return String(val);
+  if (val.toDate) return val.toDate().toISOString();
+  return String(val);
 }
 
-function getNum(obj: any, ...keys: string[]): number {
-  for (const k of keys) {
-    if (obj[k] !== undefined && obj[k] !== null) return Number(obj[k]);
-  }
-  return 0;
+function safeNumber(val: any): number {
+  if (val === null || val === undefined) return 0;
+  const num = Number(val);
+  return isNaN(num) ? 0 : num;
 }
 
-function getDate(obj: any, ...keys: string[]): string {
-  for (const k of keys) {
-    if (obj[k] !== undefined && obj[k] !== null) {
-      const val = obj[k];
-      if (val.toDate) return val.toDate().toISOString();
-      return String(val);
-    }
-  }
-  return '';
-}
-
-function getArr(obj: any, ...keys: string[]): any[] {
-  for (const k of keys) {
-    if (obj[k] !== undefined && obj[k] !== null) {
-      const val = obj[k];
-      if (Array.isArray(val)) return val;
-      if (typeof val === 'object') return Object.values(val);
-    }
-  }
+function safeArray(val: any): any[] {
+  if (!val) return [];
+  if (Array.isArray(val)) return val;
+  if (typeof val === 'object') return Object.values(val);
   return [];
 }
 
 // ===== Fetch Functions =====
-export async function getAllNovels(): Promise<Novel[]> {
+export async function getAllNovels(forceRefresh = false): Promise<Novel[]> {
+  // Check cache
+  if (!forceRefresh && novelsCache && (Date.now() - cacheTimestamp) < CACHE_DURATION) {
+    console.log('📦 Using cached novels data');
+    return novelsCache;
+  }
+
   try {
-    // Try different collection names
-    const collectionNames = ['novels', 'روايات', 'Novels', 'manga'];
+    const collectionNames = ['novels', 'روايات', 'Novels'];
     let novelsData: any[] = [];
     
     for (const collName of collectionNames) {
@@ -113,38 +108,55 @@ export async function getAllNovels(): Promise<Novel[]> {
       // Count total chapters
       const totalChapters = volumes.reduce((acc, v) => acc + v.chapters.length, 0);
       
-      novels.push({
+      // Parse genres
+      const genreArr = safeArray(n.genre || n.genres || n.category || n.categories || n.tags);
+      const genre = genreArr.map((g: any) => {
+        if (typeof g === 'object' && g !== null) return safeString(g.name || g.title || g);
+        return safeString(g);
+      }).filter(g => g);
+      
+      // Parse gallery
+      const galleryArr = safeArray(n.gallery || n.images || n.screenshots || n.pics);
+      const gallery = galleryArr.map((g: any) => {
+        if (typeof g === 'object' && g !== null) return safeString(g.url || g.src || g);
+        return safeString(g);
+      }).filter(g => g);
+      
+      const novel: Novel = {
         id: novelId,
-        title: getStr(n, 'title', 'name', 'novelName'),
-        author: getStr(n, 'author', 'writer', 'auther'),
-        cover: getStr(n, 'cover', 'image', 'thumbnail', 'img', 'coverImage', 'poster'),
-        description: getStr(n, 'description', 'synopsis', 'desc', 'summary', 'about'),
-        status: getStr(n, 'status', 'state') || 'مستمرة',
-        genre: getArr(n, 'genre', 'genres', 'category', 'categories', 'tags').map((g: any) => 
-          typeof g === 'object' ? (g.name || g.title || String(g)) : String(g)
-        ),
-        rating: getNum(n, 'rating', 'rate', 'score', 'stars'),
-        views: getNum(n, 'views', 'viewCount', 'view_count', 'reads'),
-        gallery: getArr(n, 'gallery', 'images', 'screenshots', 'pics').map((g: any) => 
-          typeof g === 'object' ? (g.url || g.src || String(g)) : String(g)
-        ),
+        title: safeString(n.title || n.name || n.novelName),
+        author: safeString(n.author || n.writer || n.auther),
+        cover: safeString(n.cover || n.image || n.thumbnail || n.img || n.coverImage || n.poster),
+        description: safeString(n.description || n.synopsis || n.desc || n.summary || n.about),
+        status: safeString(n.status || n.state) || 'مستمرة',
+        genre,
+        rating: safeNumber(n.rating || n.rate || n.score || n.stars),
+        views: safeNumber(n.views || n.viewCount || n.view_count || n.reads),
+        gallery,
         volumes,
-        dateAdded: getDate(n, 'dateAdded', 'createdAt', 'addedDate', 'date_added', 'created_at'),
-        lastUpdated: getDate(n, 'lastUpdated', 'updatedAt', 'modifiedDate', 'last_updated', 'updated_at'),
+        dateAdded: safeString(n.dateAdded || n.createdAt || n.addedDate || n.date_added || n.created_at),
+        lastUpdated: safeString(n.lastUpdated || n.updatedAt || n.modifiedDate || n.last_updated || n.updated_at),
         totalChapters,
-      });
+      };
+      
+      novels.push(novel);
     }
     
+    // Cache the result
+    novelsCache = novels;
+    cacheTimestamp = Date.now();
+    
+    console.log(`✅ Successfully loaded ${novels.length} novels`);
     return novels;
   } catch (error) {
-    console.error('Error fetching novels:', error);
-    return [];
+    console.error('❌ Error fetching novels:', error);
+    return novelsCache || getFallbackNovels();
   }
 }
 
 async function getVolumes(novelId: string, novelData: any): Promise<Volume[]> {
   try {
-    // Try subcollection first
+    // Try subcollection paths
     const volumePaths = [
       `novels/${novelId}/volumes`,
       `روايات/${novelId}/volumes`,
@@ -164,20 +176,17 @@ async function getVolumes(novelId: string, novelData: any): Promise<Volume[]> {
             const v = docSnap.data();
             const volumeId = docSnap.id;
             
-            // Get chapters for this volume
             const chapters = await getChapters(novelId, volumeId, v);
             
             volumes.push({
               id: volumeId,
-              title: getStr(v, 'title', 'name', 'volumeName') || `المجلد ${volumeId}`,
+              title: safeString(v.title || v.name || v.volumeName) || `المجلد ${volumeId}`,
               chapters,
-              number: getNum(v, 'number', 'order', 'num'),
+              number: safeNumber(v.number || v.order || v.num),
             });
           }
           
-          // Sort volumes
-          volumes.sort((a, b) => (a.number || 0) - (b.number || 0));
-          
+          volumes.sort((a, b) => a.number - b.number);
           return volumes;
         }
       } catch (e) {
@@ -185,40 +194,36 @@ async function getVolumes(novelId: string, novelData: any): Promise<Volume[]> {
       }
     }
     
-    // If no subcollection, check if volumes are embedded in novel data
+    // Check embedded volumes
     if (novelData.volumes || novelData['مجلدات']) {
       const volumesData = novelData.volumes || novelData['مجلدات'];
-      const volumesArr = Array.isArray(volumesData) ? volumesData : Object.values(volumesData);
+      const volumesArr = safeArray(volumesData);
       
-      const volumes: Volume[] = [];
-      for (let i = 0; i < volumesArr.length; i++) {
-        const v = volumesArr[i] as any;
-        const chaptersData = v.chapters || v['فصول'] || [];
-        const chaptersArr = Array.isArray(chaptersData) ? chaptersData : Object.values(chaptersData);
-        
-        const chapters: Chapter[] = chaptersArr.map((c: any, idx: number) => ({
-          id: c.id || idx + 1,
-          title: getStr(c, 'title', 'name', 'chapterName', 'chapter_title') || `الفصل ${c.id || idx + 1}`,
-          content: getStr(c, 'content', 'body', 'text', 'chapter_content', 'chapterContent'),
-          dateAdded: getDate(c, 'dateAdded', 'createdAt', 'date', 'addedDate'),
-          number: getNum(c, 'number', 'num', 'order'),
+      const volumes: Volume[] = volumesArr.map((v: any, i: number) => {
+        const chaptersData = safeArray(v.chapters || v['فصول']);
+        const chapters: Chapter[] = chaptersData.map((c: any, idx: number) => ({
+          id: safeString(c.id || idx + 1),
+          title: safeString(c.title || c.name || c.chapterName || c.chapter_title) || `الفصل ${c.id || idx + 1}`,
+          content: safeString(c.content || c.body || c.text || c.chapter_content || c.chapterContent),
+          dateAdded: safeString(c.dateAdded || c.createdAt || c.date || c.addedDate),
+          number: safeNumber(c.number || c.num || c.order),
         }));
         
-        chapters.sort((a, b) => (a.number || 0) - (b.number || 0));
+        chapters.sort((a, b) => a.number - b.number);
         
-        volumes.push({
-          id: v.id || i + 1,
-          title: getStr(v, 'title', 'name', 'volumeName') || `المجلد ${i + 1}`,
+        return {
+          id: safeString(v.id || i + 1),
+          title: safeString(v.title || v.name || v.volumeName) || `المجلد ${i + 1}`,
           chapters,
-          number: getNum(v, 'number', 'order', 'num'),
-        });
-      }
+          number: safeNumber(v.number || v.order || v.num),
+        };
+      });
       
-      volumes.sort((a, b) => (a.number || 0) - (b.number || 0));
+      volumes.sort((a, b) => a.number - b.number);
       return volumes;
     }
     
-    // Try chapters directly under novel (no volumes)
+    // Try chapters directly under novel
     const chapterPaths = [
       `novels/${novelId}/chapters`,
       `روايات/${novelId}/chapters`,
@@ -236,20 +241,21 @@ async function getVolumes(novelId: string, novelData: any): Promise<Volume[]> {
             const c = docSnap.data();
             return {
               id: docSnap.id,
-              title: getStr(c, 'title', 'name', 'chapterName', 'chapter_title') || `الفصل ${docSnap.id}`,
-              content: getStr(c, 'content', 'body', 'text', 'chapter_content', 'chapterContent'),
-              dateAdded: getDate(c, 'dateAdded', 'createdAt', 'date', 'addedDate'),
-              number: getNum(c, 'number', 'num', 'order'),
+              title: safeString(c.title || c.name || c.chapterName || c.chapter_title) || `الفصل ${docSnap.id}`,
+              content: safeString(c.content || c.body || c.text || c.chapter_content || c.chapterContent),
+              dateAdded: safeString(c.dateAdded || c.createdAt || c.date || c.addedDate),
+              number: safeNumber(c.number || c.num || c.order),
             };
           });
           
-          chapters.sort((a, b) => (a.number || 0) - (b.number || 0));
+          chapters.sort((a, b) => a.number - b.number);
           
           if (chapters.length > 0) {
             return [{
               id: '1',
               title: 'الفصول',
               chapters,
+              number: 1,
             }];
           }
         }
@@ -267,7 +273,6 @@ async function getVolumes(novelId: string, novelData: any): Promise<Volume[]> {
 
 async function getChapters(novelId: string, volumeId: string, volumeData: any): Promise<Chapter[]> {
   try {
-    // Try subcollection
     const chapterPaths = [
       `novels/${novelId}/volumes/${volumeId}/chapters`,
       `روايات/${novelId}/volumes/${volumeId}/chapters`,
@@ -287,14 +292,14 @@ async function getChapters(novelId: string, volumeId: string, volumeData: any): 
             const c = docSnap.data();
             return {
               id: docSnap.id,
-              title: getStr(c, 'title', 'name', 'chapterName', 'chapter_title') || `الفصل ${docSnap.id}`,
-              content: getStr(c, 'content', 'body', 'text', 'chapter_content', 'chapterContent'),
-              dateAdded: getDate(c, 'dateAdded', 'createdAt', 'date', 'addedDate'),
-              number: getNum(c, 'number', 'num', 'order'),
+              title: safeString(c.title || c.name || c.chapterName || c.chapter_title) || `الفصل ${docSnap.id}`,
+              content: safeString(c.content || c.body || c.text || c.chapter_content || c.chapterContent),
+              dateAdded: safeString(c.dateAdded || c.createdAt || c.date || c.addedDate),
+              number: safeNumber(c.number || c.num || c.order),
             };
           });
           
-          chapters.sort((a, b) => (a.number || 0) - (b.number || 0));
+          chapters.sort((a, b) => a.number - b.number);
           return chapters;
         }
       } catch (e) {
@@ -302,20 +307,19 @@ async function getChapters(novelId: string, volumeId: string, volumeData: any): 
       }
     }
     
-    // Check if chapters are embedded in volume data
+    // Check embedded chapters
     if (volumeData.chapters || volumeData['فصول']) {
-      const chaptersData = volumeData.chapters || volumeData['فصول'];
-      const chaptersArr = Array.isArray(chaptersData) ? chaptersData : Object.values(chaptersData);
+      const chaptersData = safeArray(volumeData.chapters || volumeData['فصول']);
       
-      const chapters: Chapter[] = chaptersArr.map((c: any, idx: number) => ({
-        id: c.id || idx + 1,
-        title: getStr(c, 'title', 'name', 'chapterName', 'chapter_title') || `الفصل ${c.id || idx + 1}`,
-        content: getStr(c, 'content', 'body', 'text', 'chapter_content', 'chapterContent'),
-        dateAdded: getDate(c, 'dateAdded', 'createdAt', 'date', 'addedDate'),
-        number: getNum(c, 'number', 'num', 'order'),
+      const chapters: Chapter[] = chaptersData.map((c: any, idx: number) => ({
+        id: safeString(c.id || idx + 1),
+        title: safeString(c.title || c.name || c.chapterName || c.chapter_title) || `الفصل ${c.id || idx + 1}`,
+        content: safeString(c.content || c.body || c.text || c.chapter_content || c.chapterContent),
+        dateAdded: safeString(c.dateAdded || c.createdAt || c.date || c.addedDate),
+        number: safeNumber(c.number || c.num || c.order),
       }));
       
-      chapters.sort((a, b) => (a.number || 0) - (b.number || 0));
+      chapters.sort((a, b) => a.number - b.number);
       return chapters;
     }
     
@@ -336,7 +340,6 @@ export async function getChapterContent(novelId: any, volumeId: any, chapterId: 
     const novel = await getNovelById(novelId);
     if (!novel) return null;
     
-    // Find the chapter in volumes
     for (const volume of novel.volumes) {
       if (String(volume.id) === String(volumeId)) {
         const chapter = volume.chapters.find(c => String(c.id) === String(chapterId));
@@ -353,7 +356,6 @@ export async function getChapterContent(novelId: any, volumeId: any, chapterId: 
   }
 }
 
-// Get all chapters with novel info for latest updates
 export async function getAllChaptersWithNovels(): Promise<{ novel: Novel; volume: Volume; chapter: Chapter }[]> {
   const novels = await getAllNovels();
   const result: { novel: Novel; volume: Volume; chapter: Chapter }[] = [];
@@ -366,7 +368,6 @@ export async function getAllChaptersWithNovels(): Promise<{ novel: Novel; volume
     });
   });
   
-  // Sort by date descending
   result.sort((a, b) => {
     const dateA = a.chapter.dateAdded ? new Date(a.chapter.dateAdded).getTime() : 0;
     const dateB = b.chapter.dateAdded ? new Date(b.chapter.dateAdded).getTime() : 0;
@@ -376,7 +377,6 @@ export async function getAllChaptersWithNovels(): Promise<{ novel: Novel; volume
   return result;
 }
 
-// Get latest novels
 export async function getLatestNovels(): Promise<Novel[]> {
   const novels = await getAllNovels();
   return novels.sort((a, b) => {
@@ -386,9 +386,8 @@ export async function getLatestNovels(): Promise<Novel[]> {
   });
 }
 
-// Get first and last chapter
 export function getFirstLastChapter(novel: Novel) {
-  const all: { volumeId: any; chapterId: any }[] = [];
+  const all: { volumeId: string; chapterId: string }[] = [];
   novel.volumes.forEach(v => {
     v.chapters.forEach(c => {
       all.push({ volumeId: v.id, chapterId: c.id });
