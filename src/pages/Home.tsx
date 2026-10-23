@@ -110,12 +110,22 @@ export default function Home() {
                 to={`/novel/${novel.id}`}
                 className="novel-card group rounded-2xl overflow-hidden bg-[#222] border border-white/5"
               >
-                <div className="aspect-[3/4] relative overflow-hidden">
-                  <img
-                    src={novel.cover}
-                    alt={novel.title}
-                    className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
-                  />
+                <div className="aspect-[3/4] relative overflow-hidden bg-[#333]">
+                  {novel.cover && novel.cover.startsWith('http') ? (
+                    <img
+                      src={novel.cover}
+                      alt={novel.title}
+                      className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+                      loading="lazy"
+                      onError={(e) => {
+                        (e.target as HTMLImageElement).src = `https://via.placeholder.com/300x400/333/c99649?text=${encodeURIComponent(novel.title)}`;
+                      }}
+                    />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-[#c99649]/20 to-[#333]">
+                      <i className="fa-solid fa-book text-4xl text-[#c99649]/50"></i>
+                    </div>
+                  )}
                   <div className="novel-card-overlay">
                     <div className="w-full">
                       <div className="flex items-center gap-2 mb-2">

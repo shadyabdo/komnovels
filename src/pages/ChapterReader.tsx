@@ -64,15 +64,47 @@ export default function ChapterReader() {
 
   // Render content with images
   const renderContent = (content: string) => {
+    if (!content) return <p className="text-gray-500 text-center py-10">لا يوجد محتوى</p>;
+    
     return content.split('\n').map((line, i) => {
       const t = line.trim();
-      if (t.match(/^https?:\/\/.+\.(jpg|jpeg|png|gif|webp|bmp)/i)) {
+      
+      // Check if line is an image URL (support many formats)
+      const isImage = 
+        t.match(/^https?:\/\/.+\.(jpg|jpeg|png|gif|webp|bmp|svg)(\?.*)?$/i) ||
+        t.match(/^https?:\/\/.+\.(jpg|jpeg|png|gif|webp|bmp|svg)$/i) ||
+        (t.startsWith('http') && (
+          t.includes('firebasestorage.googleapis.com') ||
+          t.includes('storage.googleapis.com') ||
+          t.includes('imgur.com') ||
+          t.includes('i.imgur.com') ||
+          t.includes('cdn.') ||
+          t.includes('/image') ||
+          t.includes('/img/') ||
+          t.includes('/photo')
+        )) ||
+        // Support Firebase Storage URLs
+        t.match(/^https:\/\/firebasestorage\.googleapis\.com\//i) ||
+        // Support any URL that looks like an image host
+        (t.startsWith('http') && t.match(/\.(jpg|jpeg|png|gif|webp|bmp|svg)/i));
+      
+      if (isImage) {
         return (
           <div key={i} className="my-5">
-            <img src={t} alt="" className="max-w-full h-auto rounded-xl mx-auto shadow-xl" loading="lazy" />
+            <img 
+              src={t} 
+              alt="" 
+              className="max-w-full h-auto rounded-xl mx-auto shadow-xl" 
+              loading="lazy"
+              onError={(e) => {
+                console.error('Image failed to load:', t);
+                (e.target as HTMLImageElement).style.display = 'none';
+              }}
+            />
           </div>
         );
       }
+      
       if (t === '') return <div key={i} className="h-4" />;
       return <p key={i} className="mb-4 leading-[2] text-gray-200">{t}</p>;
     });
