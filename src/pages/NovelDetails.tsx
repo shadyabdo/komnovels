@@ -119,9 +119,18 @@ export default function NovelDetails() {
             معرض الصور
           </h2>
           <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-            {novel.gallery.map((img, i) => (
+            {novel.gallery.filter(img => img && img.startsWith('http')).map((img, i) => (
               <div key={i} className="aspect-video rounded-xl overflow-hidden border border-white/5 hover:border-[#c99649]/30 transition-colors group">
-                <img src={img} alt="" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+                <img 
+                  src={img} 
+                  alt="" 
+                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                  loading="lazy"
+                  onError={(e) => {
+                    console.error('Gallery image failed:', img);
+                    (e.target as HTMLImageElement).parentElement?.remove();
+                  }}
+                />
               </div>
             ))}
           </div>
