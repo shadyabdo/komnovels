@@ -1,13 +1,39 @@
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { novels, getFirstAndLastChapter } from '../data/mockData';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { fetchNovelById, getFirstAndLastChapter, Novel } from '../firebase/service';
 
 export default function NovelDetails() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const [novel, setNovel] = useState<Novel | null>(null);
+  const [loading, setLoading] = useState(true);
   const [openVolumes, setOpenVolumes] = useState<number[]>([]);
 
-  const novel = novels.find(n => n.id === Number(id));
+  useEffect(() => {
+    async function loadNovel() {
+      if (!id) return;
+      try {
+        const data = await fetchNovelById(Number(id));
+        setNovel(data);
+      } catch (error) {
+        console.error('Error loading novel:', error);
+      } finally {
+        setLoading(false);
+      }
+    }
+    loadNovel();
+  }, [id]);
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-16 h-16 border-4 border-[#c99649] border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-gray-400">جاري تحميل الرواية...</p>
+        </div>
+      </div>
+    );
+  }
 
   if (!novel) {
     return (
@@ -62,7 +88,7 @@ export default function NovelDetails() {
               {/* Status & Rating */}
               <div className="flex flex-wrap items-center justify-center md:justify-start gap-3 mb-4">
                 <span className={`text-sm px-3 py-1 rounded-full ${
-                  novel.status === 'مستمرة' ? 'bg-green-900/50 text-green-400 border border-green-800' : 'bg-blue-900/50 text-blue-400 border border-blue-800'
+                  novel.status === 'مستمرة' || novel.status === 'ongoing' ? 'bg-green-900/50 text-green-400 border border-green-800' : 'bg-blue-900/50 text-blue-400 border border-blue-800'
                 }`}>
                   <i className="fa-solid fa-circle text-[8px] ml-1"></i>
                   {novel.status}
@@ -112,23 +138,25 @@ export default function NovelDetails() {
       </section>
 
       {/* Gallery Section */}
-      <section className="max-w-7xl mx-auto px-4 py-8">
-        <h2 className="text-xl font-bold text-white mb-6 flex items-center gap-3">
-          <i className="fa-solid fa-images text-[#c99649]"></i>
-          معرض الصور
-        </h2>
-        <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-          {novel.gallery.map((img, index) => (
-            <div key={index} className="aspect-video rounded-xl overflow-hidden border border-[#4a4a4a] hover:border-[#c99649] transition-colors">
-              <img
-                src={img}
-                alt={`${novel.title} - صورة ${index + 1}`}
-                className="w-full h-full object-cover gallery-img"
-              />
-            </div>
-          ))}
-        </div>
-      </section>
+      {novel.gallery.length > 0 && (
+        <section className="max-w-7xl mx-auto px-4 py-8">
+          <h2 className="text-xl font-bold text-white mb-6 flex items-center gap-3">
+            <i className="fa-solid fa-images text-[#c99649]"></i>
+            معرض الصور
+          </h2>
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+            {novel.gallery.map((img, index) => (
+              <div key={index} className="aspect-video rounded-xl overflow-hidden border border-[#4a4a4a] hover:border-[#c99649] transition-colors">
+                <img
+                  src={img}
+                  alt={`${novel.title} - صورة ${index + 1}`}
+                  className="w-full h-full object-cover gallery-img"
+                />
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
 
       {/* Chapters Section */}
       <section className="max-w-7xl mx-auto px-4 py-8 pb-16">
@@ -160,56 +188,63 @@ export default function NovelDetails() {
         </div>
 
         {/* Volumes Accordion */}
-        <div className="space-y-3">
-          {novel.volumes.map(volume => (
-            <div key={volume.id} className="bg-[#2a2a2a] rounded-xl border border-[#4a4a4a] overflow-hidden">
-              {/* Volume Header */}
-              <button
-                onClick={() => toggleVolume(volume.id)}
-                className="w-full flex items-center justify-between p-4 hover:bg-[#3a3a3a] transition-colors"
-              >
-                <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 bg-[#c99649]/20 rounded-lg flex items-center justify-center">
-                    <i className="fa-solid fa-folder text-[#c99649] text-sm"></i>
+        {novel.volumes.length > 0 ? (
+          <div className="space-y-3">
+            {novel.volumes.map(volume => (
+              <div key={volume.id} className="bg-[#2a2a2a] rounded-xl border border-[#4a4a4a] overflow-hidden">
+                {/* Volume Header */}
+                <button
+                  onClick={() => toggleVolume(volume.id)}
+                  className="w-full flex items-center justify-between p-4 hover:bg-[#3a3a3a] transition-colors"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 bg-[#c99649]/20 rounded-lg flex items-center justify-center">
+                      <i className="fa-solid fa-folder text-[#c99649] text-sm"></i>
+                    </div>
+                    <div className="text-right">
+                      <h3 className="text-white font-medium">{volume.title}</h3>
+                      <p className="text-gray-400 text-xs mt-0.5">{volume.chapters.length} فصل</p>
+                    </div>
                   </div>
-                  <div className="text-right">
-                    <h3 className="text-white font-medium">{volume.title}</h3>
-                    <p className="text-gray-400 text-xs mt-0.5">{volume.chapters.length} فصل</p>
-                  </div>
-                </div>
-                <i className={`fa-solid fa-chevron-down text-gray-400 transition-transform duration-300 ${
-                  openVolumes.includes(volume.id) ? 'rotate-180' : ''
-                }`}></i>
-              </button>
+                  <i className={`fa-solid fa-chevron-down text-gray-400 transition-transform duration-300 ${
+                    openVolumes.includes(volume.id) ? 'rotate-180' : ''
+                  }`}></i>
+                </button>
 
-              {/* Chapters List */}
-              <div className={`accordion-content ${openVolumes.includes(volume.id) ? 'open' : ''}`}>
-                <div className="border-t border-[#4a4a4a]">
-                  {volume.chapters.map(chapter => (
-                    <Link
-                      key={chapter.id}
-                      to={`/novel/${novel.id}/volume/${volume.id}/chapter/${chapter.id}`}
-                      className="flex items-center justify-between p-4 hover:bg-[#3a3a3a] transition-colors border-b border-[#4a4a4a]/50 last:border-b-0"
-                    >
-                      <div className="flex items-center gap-3">
-                        <div className="w-6 h-6 bg-[#3a3a3a] rounded-full flex items-center justify-center text-xs text-[#c99649]">
-                          {chapter.id}
+                {/* Chapters List */}
+                <div className={`accordion-content ${openVolumes.includes(volume.id) ? 'open' : ''}`}>
+                  <div className="border-t border-[#4a4a4a]">
+                    {volume.chapters.map(chapter => (
+                      <Link
+                        key={chapter.id}
+                        to={`/novel/${novel.id}/volume/${volume.id}/chapter/${chapter.id}`}
+                        className="flex items-center justify-between p-4 hover:bg-[#3a3a3a] transition-colors border-b border-[#4a4a4a]/50 last:border-b-0"
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className="w-6 h-6 bg-[#3a3a3a] rounded-full flex items-center justify-center text-xs text-[#c99649]">
+                            {chapter.id}
+                          </div>
+                          <span className="text-gray-300 text-sm">{chapter.title}</span>
                         </div>
-                        <span className="text-gray-300 text-sm">{chapter.title}</span>
-                      </div>
-                      <div className="flex items-center gap-3">
-                        <span className="text-gray-500 text-xs hidden md:block">
-                          {new Date(chapter.dateAdded).toLocaleDateString('ar')}
-                        </span>
-                        <i className="fa-solid fa-arrow-left text-[#c99649] text-xs"></i>
-                      </div>
-                    </Link>
-                  ))}
+                        <div className="flex items-center gap-3">
+                          <span className="text-gray-500 text-xs hidden md:block">
+                            {chapter.dateAdded ? new Date(chapter.dateAdded).toLocaleDateString('ar') : ''}
+                          </span>
+                          <i className="fa-solid fa-arrow-left text-[#c99649] text-xs"></i>
+                        </div>
+                      </Link>
+                    ))}
+                  </div>
                 </div>
               </div>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        ) : (
+          <div className="text-center py-12">
+            <i className="fa-solid fa-file-lines text-5xl text-gray-600 mb-4"></i>
+            <p className="text-gray-400">لا توجد فصول متاحة حالياً</p>
+          </div>
+        )}
       </section>
     </div>
   );

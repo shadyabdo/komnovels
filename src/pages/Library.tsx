@@ -1,10 +1,26 @@
 import { Link } from 'react-router-dom';
-import { novels } from '../data/mockData';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { fetchNovels, Novel } from '../firebase/service';
 
 export default function Library() {
+  const [novels, setNovels] = useState<Novel[]>([]);
+  const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedGenre, setSelectedGenre] = useState('');
+
+  useEffect(() => {
+    async function loadData() {
+      try {
+        const data = await fetchNovels();
+        setNovels(data);
+      } catch (error) {
+        console.error('Error loading novels:', error);
+      } finally {
+        setLoading(false);
+      }
+    }
+    loadData();
+  }, []);
 
   const allGenres = Array.from(new Set(novels.flatMap(n => n.genre)));
 
@@ -13,6 +29,17 @@ export default function Library() {
     const matchesGenre = !selectedGenre || novel.genre.includes(selectedGenre);
     return matchesSearch && matchesGenre;
   });
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-16 h-16 border-4 border-[#c99649] border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-gray-400">جاري تحميل المكتبة...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen max-w-7xl mx-auto px-4 py-8">
@@ -66,7 +93,7 @@ export default function Library() {
                 />
                 <div className="absolute top-2 left-2">
                   <span className={`text-xs px-2 py-1 rounded-full ${
-                    novel.status === 'مستمرة' ? 'bg-green-900/80 text-green-400' : 'bg-blue-900/80 text-blue-400'
+                    novel.status === 'مستمرة' || novel.status === 'ongoing' ? 'bg-green-900/80 text-green-400' : 'bg-blue-900/80 text-blue-400'
                   }`}>
                     {novel.status}
                   </span>
@@ -82,7 +109,7 @@ export default function Library() {
                   </span>
                   <span className="text-gray-500 text-xs flex items-center gap-1">
                     <i className="fa-solid fa-eye"></i>
-                    {(novel.views / 1000).toFixed(0)}K
+                    {novel.views >= 1000 ? `${(novel.views / 1000).toFixed(0)}K` : novel.views}
                   </span>
                 </div>
                 <div className="flex flex-wrap gap-1 mt-2">

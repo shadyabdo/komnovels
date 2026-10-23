@@ -1,6 +1,6 @@
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { novels } from '../data/mockData';
 import { useState, useEffect } from 'react';
+import { fetchNovelById, fetchChapter, Novel, Chapter } from '../firebase/service';
 
 type FontType = 'rubik' | 'cairo' | 'almarai' | 'tajawal';
 type BgColor = '#212121' | '#333333' | '#2a2a2a';
@@ -8,6 +8,10 @@ type BgColor = '#212121' | '#333333' | '#2a2a2a';
 export default function ChapterReader() {
   const { id, volumeId, chapterId } = useParams<{ id: string; volumeId: string; chapterId: string }>();
   const navigate = useNavigate();
+
+  const [novel, setNovel] = useState<Novel | null>(null);
+  const [chapter, setChapter] = useState<Chapter | null>(null);
+  const [loading, setLoading] = useState(true);
 
   const [font, setFont] = useState<FontType>(() => {
     return (localStorage.getItem('reader-font') as FontType) || 'rubik';
@@ -17,10 +21,6 @@ export default function ChapterReader() {
   });
   const [settingsOpen, setSettingsOpen] = useState(false);
 
-  const novel = novels.find(n => n.id === Number(id));
-  const volume = novel?.volumes.find(v => v.id === Number(volumeId));
-  const chapter = volume?.chapters.find(c => c.id === Number(chapterId));
-
   useEffect(() => {
     localStorage.setItem('reader-font', font);
   }, [font]);
@@ -29,9 +29,42 @@ export default function ChapterReader() {
     localStorage.setItem('reader-bg', bgColor);
   }, [bgColor]);
 
-  if (!novel || !volume || !chapter) {
+  useEffect(() => {
+    async function loadData() {
+      if (!id || !volumeId || !chapterId) return;
+      setLoading(true);
+      try {
+        const [novelData, chapterData] = await Promise.all([
+          fetchNovelById(Number(id)),
+          fetchChapter(Number(id), Number(volumeId), Number(chapterId))
+        ]);
+        setNovel(novelData);
+        setChapter(chapterData);
+      } catch (error) {
+        console.error('Error loading chapter:', error);
+      } finally {
+        setLoading(false);
+      }
+    }
+    loadData();
+    // Scroll to top on chapter change
+    window.scrollTo(0, 0);
+  }, [id, volumeId, chapterId]);
+
+  if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
+      <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: bgColor }}>
+        <div className="text-center">
+          <div className="w-16 h-16 border-4 border-[#c99649] border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-gray-400">جاري تحميل الفصل...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!novel || !chapter) {
+    return (
+      <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: bgColor }}>
         <div className="text-center">
           <i className="fa-solid fa-file-lines text-6xl text-gray-600 mb-4"></i>
           <p className="text-gray-400 text-xl">الفصل غير موجود</p>
@@ -201,11 +234,11 @@ export default function ChapterReader() {
           </Link>
           <h1 className="text-2xl md:text-3xl font-bold text-white mt-3">{chapter.title}</h1>
           <p className="text-gray-500 text-sm mt-2">
-            {new Date(chapter.dateAdded).toLocaleDateString('ar', {
+            {chapter.dateAdded ? new Date(chapter.dateAdded).toLocaleDateString('ar', {
               year: 'numeric',
               month: 'long',
               day: 'numeric'
-            })}
+            }) : ''}
           </p>
         </div>
 
