@@ -1,1 +1,74 @@
 @import "tailwindcss";
+
+@theme {
+  --color-primary: #c99649;
+  --color-primary-hover: #b8853a;
+  --color-dark-bg: #333333;
+  --color-dark-surface: #2a2a2a;
+  --color-dark-card: #3a3a3a;
+  --color-dark-border: #4a4a4a;
+}
+
+body {
+  font-family: 'Rubik', sans-serif;
+  background-color: #333333;
+  color: #ffffff;
+  direction: rtl;
+}
+
+.font-rubik { font-family: 'Rubik', sans-serif; }
+.font-cairo { font-family: 'Cairo', sans-serif; }
+.font-almarai { font-family: 'Almarai', sans-serif; }
+.font-tajawal { font-family: 'Tajawal', sans-serif; }
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+}
+::-webkit-scrollbar-track {
+  background: #2a2a2a;
+}
+::-webkit-scrollbar-thumb {
+  background: #c99649;
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #b8853a;
+}
+
+/* Accordion animation */
+.accordion-content {
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height 0.3s ease-out;
+}
+.accordion-content.open {
+  max-height: 2000px;
+  transition: max-height 0.5s ease-in;
+}
+
+/* Chapter content images */
+.chapter-content img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 8px;
+  margin: 16px auto;
+  display: block;
+}
+
+/* Novel card hover effect */
+.novel-card {
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+.novel-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 10px 30px rgba(201, 150, 73, 0.2);
+}
+
+/* Gallery image */
+.gallery-img {
+  transition: transform 0.3s ease;
+}
+.gallery-img:hover {
+  transform: scale(1.05);
+}
