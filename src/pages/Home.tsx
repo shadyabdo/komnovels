@@ -1,205 +1,205 @@
 import { Link } from 'react-router-dom';
 import { useState, useEffect } from 'react';
-import { fetchNovels, fetchLatestNovels, fetchAllChapters, Novel } from '../firebase/service';
+import { getAllNovels, getAllChaptersWithNovels, Novel } from '../lib/database';
+import Loading from '../components/Loading';
 
 export default function Home() {
   const [novels, setNovels] = useState<Novel[]>([]);
-  const [latestChapters, setLatestChapters] = useState<{ novel: Novel; volume: any; chapter: any }[]>([]);
+  const [chapters, setChapters] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    async function loadData() {
+    (async () => {
       try {
-        const [novelsData, chaptersData] = await Promise.all([
-          fetchLatestNovels(),
-          fetchAllChapters()
-        ]);
-        setNovels(novelsData);
-        setLatestChapters(chaptersData.slice(0, 8));
-      } catch (error) {
-        console.error('Error loading data:', error);
-      } finally {
-        setLoading(false);
-      }
-    }
-    loadData();
+        const [n, c] = await Promise.all([getAllNovels(), getAllChaptersWithNovels()]);
+        setNovels(n);
+        setChapters(c.slice(0, 10));
+      } catch (e) { console.error(e); }
+      finally { setLoading(false); }
+    })();
   }, []);
 
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <div className="w-16 h-16 border-4 border-[#c99649] border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-gray-400">جاري تحميل البيانات...</p>
-        </div>
-      </div>
-    );
-  }
+  if (loading) return <Loading text="جاري تحميل البيانات..." />;
 
-  const latestNovels = novels.slice(0, 8);
-  const totalChapters = novels.reduce((acc, n) => acc + n.volumes.reduce((a, v) => a + v.chapters.length, 0), 0);
-  const totalViews = novels.reduce((acc, n) => acc + n.views, 0);
+  const totalChapters = novels.reduce((a, n) => a + n.totalChapters, 0);
 
   return (
-    <div className="min-h-screen">
-      {/* Hero Section */}
-      <section className="relative bg-gradient-to-l from-[#2a2a2a] to-[#333333] py-16 md:py-24 overflow-hidden">
-        <div className="absolute inset-0 opacity-10">
-          <div className="absolute top-10 right-10 w-32 h-32 bg-[#c99649] rounded-full blur-3xl"></div>
-          <div className="absolute bottom-10 left-10 w-48 h-48 bg-[#c99649] rounded-full blur-3xl"></div>
-        </div>
-        <div className="max-w-7xl mx-auto px-4 relative z-10">
-          <div className="text-center">
-            <h1 className="text-4xl md:text-6xl font-bold text-white mb-4">
-              مرحباً بك في <span className="text-[#c99649]">كوم روايات</span>
-            </h1>
-            <p className="text-lg md:text-xl text-gray-300 mb-8 max-w-2xl mx-auto">
-              وجهتك الأولى لقراءة أفضل الروايات الخفيفة المترجمة. استمتع بآلاف الفصول المحدثة يومياً.
-            </p>
-            <div className="flex flex-wrap justify-center gap-4">
-              <Link
-                to="/library"
-                className="bg-[#c99649] hover:bg-[#b8853a] text-white px-8 py-3 rounded-lg font-bold transition-all duration-200 flex items-center gap-2"
-              >
-                <i className="fa-solid fa-book"></i>
-                تصفح المكتبة
-              </Link>
-              <Link
-                to="/latest"
-                className="bg-[#3a3a3a] hover:bg-[#4a4a4a] text-white px-8 py-3 rounded-lg font-bold transition-all duration-200 border border-[#4a4a4a] flex items-center gap-2"
-              >
-                <i className="fa-solid fa-clock"></i>
-                آخر الإضافات
-              </Link>
-            </div>
+    <div>
+      {/* Hero */}
+      <section className="relative hero-pattern py-20 md:py-28 overflow-hidden">
+        <div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-[#1a1a1a]"></div>
+        <div className="absolute top-1/4 right-1/4 w-96 h-96 bg-[#c99649]/5 rounded-full blur-[100px]"></div>
+        <div className="absolute bottom-1/4 left-1/4 w-64 h-64 bg-[#c99649]/3 rounded-full blur-[80px]"></div>
+        
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 relative z-10 text-center">
+          <div className="inline-flex items-center gap-2 bg-[#c99649]/10 border border-[#c99649]/20 rounded-full px-4 py-1.5 mb-6">
+            <div className="w-2 h-2 bg-[#c99649] rounded-full animate-pulse"></div>
+            <span className="text-[#c99649] text-xs font-medium">مرحباً بك في عالم الروايات</span>
+          </div>
+          
+          <h1 className="text-4xl md:text-6xl lg:text-7xl font-black text-white mb-5 leading-tight">
+            اقرأ رواياتك المفضلة
+            <br />
+            <span className="text-gold-gradient">بأسلوب مختلف</span>
+          </h1>
+          
+          <p className="text-gray-400 text-base md:text-lg max-w-xl mx-auto mb-8 leading-relaxed">
+            اكتشف مئات الروايات الخفيفة المترجمة مع تحديثات يومية وتجربة قراءة ممتعة
+          </p>
+          
+          <div className="flex flex-wrap justify-center gap-3">
+            <Link to="/library" className="bg-[#c99649] hover:bg-[#b8853a] text-white px-7 py-3 rounded-xl font-bold transition-all shadow-lg shadow-[#c99649]/20 hover:shadow-[#c99649]/40 flex items-center gap-2">
+              <i className="fa-solid fa-book-open text-sm"></i>
+              تصفح المكتبة
+            </Link>
+            <Link to="/latest" className="bg-white/5 hover:bg-white/10 text-white px-7 py-3 rounded-xl font-bold transition-all border border-white/10 flex items-center gap-2">
+              <i className="fa-solid fa-clock-rotate-left text-sm"></i>
+              آخر الإضافات
+            </Link>
           </div>
         </div>
       </section>
 
-      {/* Stats Section */}
-      <section className="bg-[#2a2a2a] py-8 border-y border-[#4a4a4a]">
-        <div className="max-w-7xl mx-auto px-4">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
-            <div className="p-4">
-              <div className="text-3xl font-bold text-[#c99649]">{novels.length}</div>
-              <div className="text-gray-400 mt-1">رواية</div>
+      {/* Stats */}
+      <section className="max-w-7xl mx-auto px-4 sm:px-6 -mt-8 relative z-20">
+        <div className="grid grid-cols-3 gap-3 md:gap-4">
+          {[
+            { value: novels.length, label: 'رواية', icon: 'fa-book' },
+            { value: totalChapters, label: 'فصل', icon: 'fa-file-lines' },
+            { value: novels.reduce((a, n) => a + n.views, 0).toLocaleString(), label: 'مشاهدة', icon: 'fa-eye' },
+          ].map((stat, i) => (
+            <div key={i} className="bg-[#222] rounded-2xl p-4 md:p-5 border border-white/5 text-center">
+              <i className={`fa-solid ${stat.icon} text-[#c99649] text-lg mb-2`}></i>
+              <div className="text-2xl md:text-3xl font-black text-white">{stat.value}</div>
+              <div className="text-gray-500 text-xs mt-1">{stat.label}</div>
             </div>
-            <div className="p-4">
-              <div className="text-3xl font-bold text-[#c99649]">{totalChapters}</div>
-              <div className="text-gray-400 mt-1">فصل</div>
-            </div>
-            <div className="p-4">
-              <div className="text-3xl font-bold text-[#c99649]">
-                {totalViews.toLocaleString('ar')}
-              </div>
-              <div className="text-gray-400 mt-1">مشاهدة</div>
-            </div>
-            <div className="p-4">
-              <div className="text-3xl font-bold text-[#c99649]">
-                {novels.filter(n => n.status === 'مستمرة' || n.status === 'ongoing').length}
-              </div>
-              <div className="text-gray-400 mt-1">رواية مستمرة</div>
-            </div>
-          </div>
+          ))}
         </div>
       </section>
 
       {/* Latest Novels */}
-      <section className="max-w-7xl mx-auto px-4 py-12">
+      <section className="max-w-7xl mx-auto px-4 sm:px-6 py-14">
         <div className="flex items-center justify-between mb-8">
-          <h2 className="text-2xl font-bold text-white flex items-center gap-3">
-            <i className="fa-solid fa-sparkles text-[#c99649]"></i>
-            أحدث الروايات
-          </h2>
-          <Link to="/library" className="text-[#c99649] hover:text-[#b8853a] flex items-center gap-1 transition-colors">
+          <div>
+            <h2 className="text-xl md:text-2xl font-bold text-white flex items-center gap-3">
+              <span className="w-8 h-8 rounded-lg bg-[#c99649]/15 flex items-center justify-center">
+                <i className="fa-solid fa-fire text-[#c99649] text-sm"></i>
+              </span>
+              أحدث الروايات
+            </h2>
+          </div>
+          <Link to="/library" className="text-[#c99649] text-sm hover:underline flex items-center gap-1">
             عرض الكل
-            <i className="fa-solid fa-arrow-left text-sm"></i>
+            <i className="fa-solid fa-chevron-left text-[10px]"></i>
           </Link>
         </div>
-        {latestNovels.length > 0 ? (
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6">
-            {latestNovels.map(novel => (
+
+        {novels.length > 0 ? (
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4 md:gap-5">
+            {novels.slice(0, 10).map(novel => (
               <Link
-                key={novel.id}
+                key={String(novel.id)}
                 to={`/novel/${novel.id}`}
-                className="novel-card bg-[#2a2a2a] rounded-xl overflow-hidden border border-[#4a4a4a] hover:border-[#c99649]"
+                className="novel-card group rounded-2xl overflow-hidden bg-[#222] border border-white/5"
               >
-                <div className="aspect-[3/4] overflow-hidden">
+                <div className="aspect-[3/4] relative overflow-hidden">
                   <img
                     src={novel.cover}
                     alt={novel.title}
-                    className="w-full h-full object-cover"
+                    className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
                   />
-                </div>
-                <div className="p-3">
-                  <h3 className="font-bold text-white text-sm md:text-base truncate">{novel.title}</h3>
-                  <div className="flex items-center gap-2 mt-2">
-                    <span className="text-yellow-400 text-xs flex items-center gap-1">
-                      <i className="fa-solid fa-star"></i>
-                      {novel.rating}
-                    </span>
-                    <span className={`text-xs px-2 py-0.5 rounded-full ${
-                      novel.status === 'مستمرة' || novel.status === 'ongoing' ? 'bg-green-900/50 text-green-400' : 'bg-blue-900/50 text-blue-400'
+                  <div className="novel-card-overlay">
+                    <div className="w-full">
+                      <div className="flex items-center gap-2 mb-2">
+                        <span className="text-yellow-400 text-xs flex items-center gap-1">
+                          <i className="fa-solid fa-star text-[10px]"></i>
+                          {novel.rating}
+                        </span>
+                        <span className="text-gray-300 text-xs flex items-center gap-1">
+                          <i className="fa-solid fa-eye text-[10px]"></i>
+                          {novel.views >= 1000 ? `${(novel.views/1000).toFixed(0)}K` : novel.views}
+                        </span>
+                      </div>
+                      <div className="flex flex-wrap gap-1">
+                        {novel.genre.slice(0, 2).map(g => (
+                          <span key={g} className="text-[10px] bg-white/10 text-white/80 px-2 py-0.5 rounded-full backdrop-blur-sm">{g}</span>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                  {/* Status Badge */}
+                  <div className="absolute top-2 right-2">
+                    <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium backdrop-blur-sm ${
+                      novel.status === 'مستمرة' || novel.status === 'ongoing' 
+                        ? 'bg-green-500/20 text-green-400 border border-green-500/30' 
+                        : 'bg-blue-500/20 text-blue-400 border border-blue-500/30'
                     }`}>
                       {novel.status}
                     </span>
                   </div>
                 </div>
+                <div className="p-3">
+                  <h3 className="font-bold text-white text-sm truncate">{novel.title}</h3>
+                  <p className="text-gray-500 text-xs mt-1 truncate">{novel.author}</p>
+                </div>
               </Link>
             ))}
           </div>
         ) : (
-          <div className="text-center py-12">
-            <i className="fa-solid fa-book-open text-5xl text-gray-600 mb-4"></i>
-            <p className="text-gray-400">لا توجد روايات متاحة حالياً</p>
-          </div>
+          <EmptyState icon="fa-book" text="لا توجد روايات متاحة" />
         )}
       </section>
 
       {/* Latest Chapters */}
-      <section className="max-w-7xl mx-auto px-4 py-12">
+      <section className="max-w-7xl mx-auto px-4 sm:px-6 py-14">
         <div className="flex items-center justify-between mb-8">
-          <h2 className="text-2xl font-bold text-white flex items-center gap-3">
-            <i className="fa-solid fa-clock text-[#c99649]"></i>
-            آخر الفصول المضافة
+          <h2 className="text-xl md:text-2xl font-bold text-white flex items-center gap-3">
+            <span className="w-8 h-8 rounded-lg bg-[#c99649]/15 flex items-center justify-center">
+              <i className="fa-solid fa-clock-rotate-left text-[#c99649] text-sm"></i>
+            </span>
+            آخر الفصول
           </h2>
-          <Link to="/latest" className="text-[#c99649] hover:text-[#b8853a] flex items-center gap-1 transition-colors">
+          <Link to="/latest" className="text-[#c99649] text-sm hover:underline flex items-center gap-1">
             عرض الكل
-            <i className="fa-solid fa-arrow-left text-sm"></i>
+            <i className="fa-solid fa-chevron-left text-[10px]"></i>
           </Link>
         </div>
-        {latestChapters.length > 0 ? (
-          <div className="bg-[#2a2a2a] rounded-xl border border-[#4a4a4a] overflow-hidden">
-            {latestChapters.map((item, index) => (
+
+        {chapters.length > 0 ? (
+          <div className="bg-[#222] rounded-2xl border border-white/5 overflow-hidden divide-y divide-white/5">
+            {chapters.map((item, i) => (
               <Link
-                key={`${item.novel.id}-${item.chapter.id}`}
-                to={`/novel/${item.novel.id}/volume/${item.volume.id}/chapter/${item.chapter.id}`}
-                className={`flex items-center gap-4 p-4 hover:bg-[#3a3a3a] transition-colors ${
-                  index !== latestChapters.length - 1 ? 'border-b border-[#4a4a4a]' : ''
-                }`}
+                key={`${item.novel.id}-${item.chapter.id}-${i}`}
+                to={`/novel/${item.novel.id}/read/${item.volume.id}/${item.chapter.id}`}
+                className="flex items-center gap-4 p-4 hover:bg-white/[0.02] transition-colors group"
               >
-                <img
-                  src={item.novel.cover}
-                  alt={item.novel.title}
-                  className="w-12 h-16 rounded-lg object-cover flex-shrink-0"
-                />
+                <img src={item.novel.cover} alt="" className="w-11 h-14 rounded-lg object-cover flex-shrink-0" />
                 <div className="flex-1 min-w-0">
-                  <h4 className="text-white font-medium text-sm md:text-base truncate">{item.novel.title}</h4>
-                  <p className="text-[#c99649] text-sm truncate">{item.chapter.title}</p>
+                  <h4 className="text-white text-sm font-medium truncate group-hover:text-[#c99649] transition-colors">{item.novel.title}</h4>
+                  <p className="text-[#c99649]/80 text-xs mt-0.5 truncate">{item.chapter.title}</p>
                 </div>
-                <div className="text-gray-400 text-xs flex-shrink-0">
+                <span className="text-gray-600 text-xs flex-shrink-0 hidden sm:block">
                   {item.chapter.dateAdded ? new Date(item.chapter.dateAdded).toLocaleDateString('ar') : ''}
-                </div>
+                </span>
+                <i className="fa-solid fa-chevron-left text-gray-600 text-xs group-hover:text-[#c99649] transition-colors"></i>
               </Link>
             ))}
           </div>
         ) : (
-          <div className="text-center py-12">
-            <i className="fa-solid fa-file-lines text-5xl text-gray-600 mb-4"></i>
-            <p className="text-gray-400">لا توجد فصول متاحة حالياً</p>
-          </div>
+          <EmptyState icon="fa-file-lines" text="لا توجد فصول متاحة" />
         )}
       </section>
+    </div>
+  );
+}
+
+function EmptyState({ icon, text }: { icon: string; text: string }) {
+  return (
+    <div className="text-center py-16">
+      <div className="w-16 h-16 rounded-2xl bg-white/5 flex items-center justify-center mx-auto mb-4">
+        <i className={`fa-solid ${icon} text-2xl text-gray-600`}></i>
+      </div>
+      <p className="text-gray-500">{text}</p>
     </div>
   );
 }
